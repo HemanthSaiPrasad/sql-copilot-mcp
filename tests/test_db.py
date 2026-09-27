@@ -4,6 +4,7 @@ import psycopg
 import pytest
 
 from sql_copilot_mcp import db
+from sql_copilot_mcp.guard import UnsafeQueryError
 
 
 def test_list_tables_includes_core_tables():
@@ -36,5 +37,12 @@ def test_run_query_caps_rows():
 
 
 def test_run_query_blocks_writes():
-    with pytest.raises(psycopg.Error):
+    # Layer 1: the guard rejects it before it reaches the database
+    with pytest.raises(UnsafeQueryError):
         db.run_query("DELETE FROM customer WHERE customer_id = 1")
+
+
+def test_database_blocks_writes_even_without_guard():
+    # Layer 2: even if the guard had a bug, the read-only database refuses
+    with db._connect() as conn, pytest.raises(psycopg.Error):
+        conn.execute("DELETE FROM customer WHERE customer_id = 1")

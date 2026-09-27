@@ -6,6 +6,8 @@ from decimal import Decimal
 
 import psycopg
 
+from sql_copilot_mcp.guard import check_and_prepare
+
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
     "postgresql://copilot_reader:reader_pw@localhost:5432/pagila",
@@ -60,9 +62,10 @@ def describe_table(table_name: str) -> list[dict]:
 
 
 def run_query(sql: str) -> dict:
-    """Run a read-only SQL query and return at most MAX_ROWS rows."""
+    """Check the query with the guard, run it, and return at most MAX_ROWS rows."""
+    safe_sql = check_and_prepare(sql, max_rows=MAX_ROWS + 1)  # +1 so we can detect "truncated"
     with _connect() as conn:
-        cur = conn.execute(sql)
+        cur = conn.execute(safe_sql)
         columns = [col.name for col in cur.description]
         rows = cur.fetchmany(MAX_ROWS + 1)
     truncated = len(rows) > MAX_ROWS

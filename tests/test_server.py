@@ -24,3 +24,23 @@ def test_server_runs_a_query():
     result = asyncio.run(check())
     assert result.is_error is False
     assert "one" in str(result.content)
+
+
+def test_server_reports_blocked_query_as_error():
+    async def check():
+        async with Client(mcp) as client:
+            return await client.call_tool("run_query", {"sql": "DROP TABLE customer"})
+
+    result = asyncio.run(check())
+    assert result.is_error is True
+    assert "Query blocked: Only SELECT" in str(result.content)
+
+
+def test_server_reports_sql_mistakes_so_ai_can_fix_them():
+    async def check():
+        async with Client(mcp) as client:
+            return await client.call_tool("run_query", {"sql": "SELECT no_such_column FROM customer"})
+
+    result = asyncio.run(check())
+    assert result.is_error is True
+    assert "no_such_column" in str(result.content)
