@@ -1,4 +1,5 @@
 # SQL Copilot MCP
+[![tests](https://github.com/HemanthSaiPrasad/sql-copilot-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/HemanthSaiPrasad/sql-copilot-mcp/actions/workflows/tests.yml)
 
 Ask questions about a database in plain English and get answers backed by real SQL.
 
