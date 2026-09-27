@@ -15,13 +15,19 @@ mcp = MCPServer("sql-copilot")
 @mcp.tool()
 def list_tables() -> list[str]:
     """List all tables and views in the database. Call this first to see what data exists."""
-    return db.list_tables()
+    try:
+        return db.list_tables()
+    except psycopg.Error as e:
+        raise ToolError(f"Database error: {e}") from e
 
 
 @mcp.tool()
 def describe_table(table_name: str) -> list[dict]:
     """Show the columns of one table (name, type, nullable). Use before writing SQL."""
-    return db.describe_table(table_name)
+    try:
+        return db.describe_table(table_name)
+    except psycopg.Error as e:
+        raise ToolError(f"Database error: {e}") from e
 
 
 @mcp.tool()

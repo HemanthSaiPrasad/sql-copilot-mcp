@@ -44,3 +44,16 @@ def test_server_reports_sql_mistakes_so_ai_can_fix_them():
     result = asyncio.run(check())
     assert result.is_error is True
     assert "no_such_column" in str(result.content)
+
+
+def test_server_explains_when_database_is_down(monkeypatch):
+    # Point at a port where no database is running
+    monkeypatch.setattr("sql_copilot_mcp.db.DATABASE_URL", "postgresql://x:y@localhost:1/none")
+
+    async def check():
+        async with Client(mcp) as client:
+            return await client.call_tool("list_tables", {})
+
+    result = asyncio.run(check())
+    assert result.is_error is True
+    assert "Database error" in str(result.content)  # a clear reason, not a vague failure
