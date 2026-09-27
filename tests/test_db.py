@@ -46,3 +46,9 @@ def test_database_blocks_writes_even_without_guard():
     # Layer 2: even if the guard had a bug, the read-only database refuses
     with db._connect() as conn, pytest.raises(psycopg.Error):
         conn.execute("DELETE FROM customer WHERE customer_id = 1")
+
+
+def test_staff_passwords_are_not_readable():
+    # Column-level permissions: the AI's database user cannot see credentials
+    with db._connect() as conn, pytest.raises(psycopg.Error):
+        conn.execute("SELECT password FROM staff")
