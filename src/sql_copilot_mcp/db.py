@@ -76,3 +76,28 @@ def run_query(sql: str) -> dict:
         "row_count": len(rows),
         "truncated": truncated,
     }
+
+
+def get_schema() -> str:
+    """Every table and view with its columns, in one compact block of text.
+
+    Only lists columns the read-only user may SELECT, so hidden columns
+    (like staff passwords) are never shown to the AI.
+    """
+    sql = """
+        SELECT c.relname, a.attname, format_type(a.atttypid, a.atttypmod)
+        FROM pg_class c
+        JOIN pg_namespace n ON n.oid = c.relnamespace
+        JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+        WHERE n.nspname = 'public'
+          AND c.relkind IN ('r', 'p', 'v', 'm')
+          AND NOT c.relispartition
+          AND has_column_privilege(c.oid, a.attnum, 'SELECT')
+        ORDER BY c.relname, a.attnum
+    """
+    with _connect() as conn:
+        rows = conn.execute(sql).fetchall()
+    tables: dict[str, list[str]] = {}
+    for table, column, col_type in rows:
+        tables.setdefault(table, []).append(f"{column} {col_type}")
+    return "\n".join(f"{table}({', '.join(cols)})" for table, cols in tables.items())

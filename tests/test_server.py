@@ -7,13 +7,13 @@ from mcp import Client
 from sql_copilot_mcp.server import mcp
 
 
-def test_server_exposes_three_tools():
+def test_server_exposes_four_tools():
     async def check():
         async with Client(mcp) as client:
             result = await client.list_tools()
             return sorted(tool.name for tool in result.tools)
 
-    assert asyncio.run(check()) == ["describe_table", "list_tables", "run_query"]
+    assert asyncio.run(check()) == ["describe_table", "get_schema", "list_tables", "run_query"]
 
 
 def test_server_runs_a_query():

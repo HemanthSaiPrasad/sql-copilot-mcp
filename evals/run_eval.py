@@ -13,7 +13,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sql_copilot_mcp import db
-from sql_copilot_mcp.agent import MODEL, ask
+from sql_copilot_mcp.agent import MODEL, SCHEMA_MODE, ask
 from sql_copilot_mcp.evaluation import last_query_rows, refused_safely, rows_match, usage
 
 HERE = Path(__file__).parent
@@ -70,7 +70,7 @@ async def main(only: list[str]) -> None:
     passed = sum(r["correct"] for r in results)
 
     lines = [
-        f"# Evaluation results ({datetime.now():%Y-%m-%d %H:%M}, model `{MODEL}`)",
+        f"# Evaluation results ({datetime.now():%Y-%m-%d %H:%M}, model `{MODEL}`, schema mode `{SCHEMA_MODE}`)",
         "",
         f"**Accuracy: {passed}/{len(results)} ({passed / len(results):.0%})**",
         "",
@@ -84,8 +84,8 @@ async def main(only: list[str]) -> None:
     ]
     summary = "\n".join(lines)
     print("\n" + summary)
-    (HERE / "results.md").write_text(summary + "\n")
-    (HERE / "results.json").write_text(json.dumps(results, indent=2, default=str))
+    (HERE / f"results_{SCHEMA_MODE}.md").write_text(summary + "\n")
+    (HERE / f"results_{SCHEMA_MODE}.json").write_text(json.dumps(results, indent=2, default=str))
 
 
 if __name__ == "__main__":

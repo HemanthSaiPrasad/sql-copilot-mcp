@@ -52,3 +52,10 @@ def test_staff_passwords_are_not_readable():
     # Column-level permissions: the AI's database user cannot see credentials
     with db._connect() as conn, pytest.raises(psycopg.Error):
         conn.execute("SELECT password FROM staff")
+
+
+def test_schema_lists_tables_but_hides_passwords():
+    schema = db.get_schema()
+    assert "customer(customer_id integer" in schema
+    assert "staff(" in schema
+    assert "password" not in schema

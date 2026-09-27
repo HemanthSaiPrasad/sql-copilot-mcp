@@ -1,4 +1,4 @@
-"""MCP server: exposes the database to any AI assistant as three tools."""
+"""MCP server: exposes the database to any AI assistant as four tools."""
 
 from typing import Any
 
@@ -26,6 +26,15 @@ def describe_table(table_name: str) -> list[dict]:
     """Show the columns of one table (name, type, nullable). Use before writing SQL."""
     try:
         return db.describe_table(table_name)
+    except psycopg.Error as e:
+        raise ToolError(f"Database error: {e}") from e
+
+
+@mcp.tool()
+def get_schema() -> str:
+    """Get ALL tables and their columns in one call. Faster than list_tables + describe_table."""
+    try:
+        return db.get_schema()
     except psycopg.Error as e:
         raise ToolError(f"Database error: {e}") from e
 

@@ -59,3 +59,10 @@ def test_agent_cannot_bypass_the_guard():
         [tool_call("DELETE FROM customer", "c1"), AIMessage("I can't do that.")],
     )
     assert "Query blocked" in tool_outputs(result)[0]
+
+
+def test_preload_mode_answers_without_exploring():
+    replies = [tool_call("SELECT count(*) AS n FROM film", "c1"), AIMessage("There are many films.")]
+    result = asyncio.run(ask("How many films?", model=FakeModel(responses=replies), server=mcp, mode="preload"))
+    assert result["answer"] == "There are many films."
+    assert '"n"' in tool_outputs(result)[0]

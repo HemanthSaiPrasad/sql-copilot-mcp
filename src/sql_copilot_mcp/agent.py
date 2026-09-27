@@ -17,6 +17,9 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from mcp import Client, StdioServerParameters
 
 MODEL = os.getenv("COPILOT_MODEL", "claude-haiku-4-5-20251001")
+# "explore": the agent discovers tables itself with list_tables/describe_table (more calls)
+# "preload": we fetch the whole schema once and put it in the prompt (fewer calls)
+SCHEMA_MODE = os.getenv("COPILOT_SCHEMA_MODE", "preload")
 MAX_STEPS = 20  # safety stop: the agent may take at most this many graph steps
 
 SYSTEM_PROMPT = """You are SQL Copilot, a data analyst for a DVD rental business.
@@ -26,7 +29,22 @@ The data lives in a PostgreSQL database. To answer a question:
 3. Write ONE SELECT query and call run_query.
 4. If run_query returns an error, read it, fix the SQL, and try again.
 5. Answer in plain English and show the final SQL you used.
+Location questions ("by country", "by city") mean where the CUSTOMER lives
+(customer -> address -> city -> country), unless the question mentions stores.
 Every number in your answer must come from a query result. Never guess."""
+
+PRELOAD_PROMPT = """You are SQL Copilot, a data analyst for a DVD rental business.
+The data lives in a PostgreSQL database. Its full schema is below, so you do NOT
+need list_tables or describe_table. To answer a question:
+1. Write ONE SELECT query using the schema and call run_query.
+2. If run_query returns an error, read it, fix the SQL, and try again.
+3. Answer in plain English and show the final SQL you used.
+Location questions ("by country", "by city") mean where the CUSTOMER lives
+(customer -> address -> city -> country), unless the question mentions stores.
+Every number in your answer must come from a query result. Never guess.
+
+DATABASE SCHEMA:
+{schema}"""
 
 # By default the agent starts your MCP server as a separate process, like Claude Desktop does
 DEFAULT_SERVER = StdioServerParameters(command=sys.executable, args=["-m", "sql_copilot_mcp.server"])
@@ -54,12 +72,12 @@ def mcp_to_langchain_tools(client: Client, mcp_tools) -> list[StructuredTool]:
     return [make_tool(t) for t in mcp_tools]
 
 
-def build_graph(model, tools):
+def build_graph(model, tools, system_prompt: str = SYSTEM_PROMPT):
     """The agent loop: call the model; if it asks for tools, run them and go back."""
     model_with_tools = model.bind_tools(tools)
 
     async def agent(state: MessagesState):
-        messages = [SystemMessage(SYSTEM_PROMPT), *state["messages"]]
+        messages = [SystemMessage(system_prompt), *state["messages"]]
         return {"messages": [await model_with_tools.ainvoke(messages)]}
 
     graph = StateGraph(MessagesState)
@@ -77,11 +95,16 @@ def default_model():
     return ChatAnthropic(model=MODEL, temperature=0)
 
 
-async def ask(question: str, model=None, server=DEFAULT_SERVER) -> dict:
+async def ask(question: str, model=None, server=DEFAULT_SERVER, mode: str | None = None) -> dict:
     """Answer one question. Returns the final answer plus every step taken."""
+    mode = mode or SCHEMA_MODE
     async with Client(server) as client:
         tools = mcp_to_langchain_tools(client, (await client.list_tools()).tools)
-        graph = build_graph(model or default_model(), tools)
+        system_prompt = SYSTEM_PROMPT
+        if mode == "preload":
+            schema = await client.call_tool("get_schema", {})
+            system_prompt = PRELOAD_PROMPT.format(schema=schema.structured_content["result"])
+        graph = build_graph(model or default_model(), tools, system_prompt)
         state = await graph.ainvoke(
             {"messages": [HumanMessage(question)]},
             config={"recursion_limit": MAX_STEPS},
