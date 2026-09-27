@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Pagila data (downloaded by db/download_pagila.sh)
+db/init/01-schema.sql
+db/init/02-data.sql
