@@ -1,0 +1,40 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Pagila data
+        run: bash db/download_pagila.sh
+
+      - name: Start PostgreSQL
+        run: docker compose up -d
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Wait for database to finish loading
+        run: |
+          for i in $(seq 1 60); do
+            if docker compose exec -T -e PGPASSWORD=reader_pw db \
+              psql -h localhost -U copilot_reader -d pagila \
+              -c "select 1 from film limit 1" > /dev/null 2>&1; then
+              echo "Database ready"; exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs db
+          exit 1
+
+      - name: Run tests
+        run: uv run pytest -q
